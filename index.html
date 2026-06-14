@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crónicas de Calabozo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">D20</span>
+          <div>
+            <h1>Crónicas de Calabozo</h1>
+            <p>Gestor de partida persistente</p>
+          </div>
+        </div>
+
+        <div class="party-tools">
+          <button id="newCampaignBtn" class="ghost-button" type="button">Nueva campaña</button>
+          <button id="exportBtn" class="ghost-button" type="button">Exportar</button>
+          <label class="ghost-button file-button">
+            Importar
+            <input id="importInput" type="file" accept="application/json" />
+          </label>
+        </div>
+
+        <nav id="characterList" class="character-list" aria-label="Personajes"></nav>
+      </aside>
+
+      <main class="main-panel">
+        <section class="hero-panel">
+          <div class="portrait-wrap">
+            <img id="portraitPreview" alt="Retrato del personaje" />
+            <label class="portrait-upload">
+              Cambiar foto
+              <input id="portraitInput" type="file" accept="image/*" />
+            </label>
+          </div>
+
+          <div class="identity-grid">
+            <label>
+              Nombre
+              <input id="characterName" type="text" />
+            </label>
+            <label>
+              Clase única
+              <select id="characterClass"></select>
+            </label>
+            <label>
+              Nivel
+              <input id="characterLevel" type="number" min="1" max="99" />
+            </label>
+            <label>
+              Dificultad
+              <select id="difficulty">
+                <option value="normal">Normal</option>
+                <option value="heroica">Heroica</option>
+                <option value="pesadilla">Pesadilla</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <details class="panel stats-panel" open>
+            <summary class="panel-heading">
+              <h2>Estadísticas</h2>
+              <span id="saveStatus">Guardado</span>
+            </summary>
+            <div id="statsGrid" class="stats-grid"></div>
+          </details>
+
+          <details class="panel notes-panel">
+            <summary class="panel-heading">
+              <h2>Notas de campaña</h2>
+              <span>Desplegar</span>
+            </summary>
+            <textarea id="campaignNotes" rows="8" placeholder="Eventos, decisiones, deudas, aliados, enemigos..."></textarea>
+          </details>
+
+          <details class="panel wide" open>
+            <summary class="panel-heading">
+              <h2>10 habilidades del personaje</h2>
+              <span>Niveles y estadísticas extra</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addPersonalSkill" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="personalSkills" class="list-editor"></div>
+          </details>
+
+          <details class="panel wide">
+            <summary class="panel-heading">
+              <h2>30 habilidades únicas</h2>
+              <span>Desplegar</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addUniqueSkill" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="uniqueSkills" class="list-editor"></div>
+          </details>
+
+          <details class="panel wide">
+            <summary class="panel-heading">
+              <h2>Objetos</h2>
+              <span>Desplegar</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addItem" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="itemsList" class="list-editor"></div>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <template id="rowTemplate">
+      <article class="editable-row">
+        <input class="row-title" type="text" />
+        <textarea class="row-desc" rows="2"></textarea>
+        <button class="icon-button delete-row" type="button" aria-label="Eliminar">×</button>
+      </article>
+    </template>
+
+    <template id="skillTemplate">
+      <article class="skill-row">
+        <div class="skill-main">
+          <input class="skill-title" type="text" placeholder="Nombre de habilidad" />
+          <select class="skill-level" aria-label="Nivel de habilidad">
+            <option value="I">I</option>
+            <option value="II">II</option>
+            <option value="III">III</option>
+            <option value="IV">IV</option>
+            <option value="V">V</option>
+          </select>
+          <input class="skill-cooldown" type="text" placeholder="Enfriamiento" />
+          <button class="icon-button delete-skill" type="button" aria-label="Eliminar">×</button>
+        </div>
+        <textarea class="skill-desc" rows="2" placeholder="Efecto, costo, alcance, requisitos o características"></textarea>
+        <div class="bonus-grid"></div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
