@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DAMNATUS</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">DAMNATUS</span>
+          <div>
+            <h1>DAMNATUS</h1>
+            <p>Gestor de partida persistente</p>
+          </div>
+        </div>
+
+        <div class="party-tools">
+          <button id="addCharacterBtn" class="ghost-button" type="button">Agregar personaje</button>
+          <button id="newCampaignBtn" class="ghost-button" type="button">Nueva campaña</button>
+          <button id="exportBtn" class="ghost-button" type="button">Exportar</button>
+          <label class="ghost-button file-button">
+            Importar
+            <input id="importInput" type="file" accept="application/json" />
+          </label>
+        </div>
+
+        <nav id="characterList" class="character-list" aria-label="Personajes"></nav>
+      </aside>
+
+      <main class="main-panel">
+        <section class="hero-panel">
+          <div class="portrait-wrap">
+            <img id="portraitPreview" alt="Retrato del personaje" />
+            <label class="portrait-upload">
+              Cambiar foto
+              <input id="portraitInput" type="file" accept="image/*" />
+            </label>
+          </div>
+
+          <div class="identity-grid">
+            <label>
+              Nombre
+              <input id="characterName" type="text" />
+            </label>
+            <label>
+              Clase
+              <select id="characterClass"></select>
+            </label>
+            <label>
+              Nivel
+              <input id="characterLevel" type="number" min="1" max="99" />
+            </label>
+            <label>
+              Dificultad
+              <select id="difficulty">
+                <option value="normal">Normal</option>
+                <option value="heroica">Heroica</option>
+                <option value="pesadilla">Pesadilla</option>
+              </select>
+            </label>
+            <button id="deleteCharacterBtn" class="danger-button" type="button">Eliminar personaje</button>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <details class="panel stats-panel" open>
+            <summary class="panel-heading">
+              <h2>Estadísticas</h2>
+              <span id="saveStatus">Guardado</span>
+            </summary>
+            <div id="statsGrid" class="stats-grid"></div>
+          </details>
+
+          <details class="panel tracker-panel" open>
+            <summary class="panel-heading">
+              <h2>Partida</h2>
+              <span>Rondas y mazmorras</span>
+            </summary>
+            <div class="tracker-grid">
+              <div class="tracker-card">
+                <span>Ronda</span>
+                <strong id="roundCounter">0</strong>
+              </div>
+              <div class="tracker-card">
+                <span>Mazmorra</span>
+                <strong id="dungeonCounter">1</strong>
+              </div>
+            </div>
+            <div class="section-actions split-actions">
+              <button id="endTurnBtn" class="small-button" type="button">Finalizar turno</button>
+              <button id="endDungeonBtn" class="danger-button" type="button">Finalizar mazmorra</button>
+            </div>
+          </details>
+
+          <details class="panel notes-panel">
+            <summary class="panel-heading">
+              <h2>Notas de campaña</h2>
+              <span>Desplegar</span>
+            </summary>
+            <textarea id="campaignNotes" rows="8" placeholder="Eventos, decisiones, deudas, aliados, enemigos..."></textarea>
+          </details>
+
+          <details class="panel wide" open>
+            <summary class="panel-heading">
+              <h2>Habilidades del personaje</h2>
+              <span>Bonos y enfriamiento</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addPersonalSkill" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="personalSkills" class="list-editor"></div>
+          </details>
+
+          <details class="panel wide">
+            <summary class="panel-heading">
+              <h2>Habilidades únicas</h2>
+              <span>Bonos y enfriamiento</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addUniqueSkill" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="uniqueSkills" class="list-editor"></div>
+          </details>
+
+          <details class="panel wide">
+            <summary class="panel-heading">
+              <h2>Objetos</h2>
+              <span>Bonos de estadísticas</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addItem" class="small-button" type="button">Agregar</button>
+            </div>
+            <div id="itemsList" class="list-editor"></div>
+          </details>
+
+          <details class="panel wide">
+            <summary class="panel-heading">
+              <h2>Invocados</h2>
+              <span>Criaturas y estadísticas</span>
+            </summary>
+            <div class="section-actions">
+              <button id="addSummon" class="small-button" type="button">Agregar invocado</button>
+            </div>
+            <div id="summonsList" class="list-editor"></div>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <template id="effectTemplate">
+      <article class="effect-row">
+        <div class="effect-main">
+          <input class="effect-title" type="text" placeholder="Nombre" />
+          <select class="effect-level" aria-label="Nivel">
+            <option value="I">I</option>
+            <option value="II">II</option>
+            <option value="III">III</option>
+            <option value="IV">IV</option>
+            <option value="V">V</option>
+          </select>
+          <select class="cooldown-type" aria-label="Tipo de enfriamiento">
+            <option value="none">Sin enfriamiento</option>
+            <option value="rounds">Por rondas</option>
+            <option value="dungeon">Por mazmorra</option>
+          </select>
+          <input class="cooldown-rounds" type="number" min="1" placeholder="Rondas" />
+          <button class="use-effect small-button" type="button">Usar</button>
+          <button class="icon-button delete-effect" type="button" aria-label="Eliminar">×</button>
+        </div>
+        <textarea class="effect-desc" rows="2" placeholder="Efecto, costo, alcance, requisitos o características"></textarea>
+        <div class="cooldown-status"></div>
+        <div class="bonus-grid"></div>
+      </article>
+    </template>
+
+    <template id="itemTemplate">
+      <article class="effect-row">
+        <div class="item-main">
+          <input class="item-title" type="text" placeholder="Nombre del objeto" />
+          <button class="icon-button delete-item" type="button" aria-label="Eliminar">×</button>
+        </div>
+        <textarea class="item-desc" rows="2" placeholder="Descripción o uso del objeto"></textarea>
+        <div class="bonus-grid"></div>
+      </article>
+    </template>
+
+    <template id="summonTemplate">
+      <article class="summon-row">
+        <div class="item-main">
+          <input class="summon-name" type="text" placeholder="Nombre del invocado" />
+          <button class="icon-button delete-summon" type="button" aria-label="Eliminar">×</button>
+        </div>
+        <div class="summon-stats-grid"></div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
