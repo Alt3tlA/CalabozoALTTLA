@@ -196,7 +196,12 @@ function getTotalBonuses(character) {
 
 function saveState() {
   state.activeId = activeId;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    alert("No se pudo guardar. La imagen o la campaña ocupan demasiado espacio en este navegador. Prueba con una foto más liviana o exporta la campaña como respaldo.");
+    throw error;
+  }
   els.saveStatus.textContent = "Guardando...";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -515,9 +520,10 @@ function bindInputs() {
   els.portraitInput.addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    currentCharacter().portrait = await readFileAsDataUrl(file);
+    currentCharacter().portrait = await readImageAsCompressedDataUrl(file);
     saveState();
     render();
+    event.target.value = "";
   });
 
   document.querySelector("#addCharacterBtn").addEventListener("click", () => {
@@ -611,6 +617,30 @@ async function importCampaign(event) {
   saveState();
   render();
   event.target.value = "";
+}
+
+function readImageAsCompressedDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 900;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(image.src);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+    image.src = URL.createObjectURL(file);
+  });
 }
 
 function readFileAsDataUrl(file) {
