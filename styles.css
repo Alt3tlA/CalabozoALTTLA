@@ -38,6 +38,116 @@ button {
   cursor: pointer;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+.lobby-view {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.lobby-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.lobby-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.lobby-header h1 {
+  margin: 0 0 4px;
+  font-size: clamp(1.8rem, 4vw, 3.4rem);
+}
+
+.lobby-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.lobby-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(34, 37, 30, 0.94);
+}
+
+.lobby-wide {
+  grid-column: 1 / -1;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-title h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.panel-title span {
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.primary-button {
+  border-color: rgba(215, 164, 65, 0.7);
+  background: #302815;
+  color: var(--accent);
+}
+
+.lobby-people-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lobby-person {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  background: #191d17;
+}
+
+.lobby-person.dm {
+  border-color: rgba(215, 164, 65, 0.72);
+  background: #302815;
+}
+
+.lobby-person strong,
+.lobby-person span {
+  display: block;
+}
+
+.lobby-person span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.lobby-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -95,6 +205,124 @@ button {
 
 .party-tools .ghost-button:first-child {
   grid-column: 1 / -1;
+}
+
+.table-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 20px;
+  background: rgba(34, 37, 30, 0.9);
+}
+
+.table-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.table-card-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.table-card-heading strong {
+  border: 1px solid rgba(111, 176, 166, 0.55);
+  border-radius: 999px;
+  color: #a8ded6;
+  font-size: 0.76rem;
+  padding: 4px 8px;
+}
+
+.copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+}
+
+.participant-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.active-people {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.active-people-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.active-people-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.active-people-heading strong {
+  color: var(--accent);
+}
+
+.active-people-list {
+  display: grid;
+  gap: 8px;
+}
+
+.active-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  background: #191d17;
+}
+
+.active-person.dm {
+  border-color: rgba(215, 164, 65, 0.72);
+  background: #302815;
+}
+
+.active-person strong,
+.active-person span {
+  display: block;
+}
+
+.active-person strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.active-person span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.active-dot {
+  border: 1px solid rgba(111, 176, 166, 0.55);
+  border-radius: 999px;
+  color: #a8ded6 !important;
+  flex: 0 0 auto;
+  padding: 4px 7px;
+}
+
+.table-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .ghost-button,
@@ -226,6 +454,10 @@ button {
   grid-column: 1 / -1;
 }
 
+#levelUpBtn {
+  align-self: end;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -345,6 +577,12 @@ details.panel > :not(summary) {
   gap: 12px;
 }
 
+.dm-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+}
+
 .tracker-card {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -363,6 +601,35 @@ details.panel > :not(summary) {
 .tracker-card strong {
   color: var(--accent);
   font-size: 2rem;
+}
+
+.bot-summary-grid,
+.bot-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.bot-data-grid h3 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  color: var(--accent);
+}
+
+.bot-data-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bot-data-row,
+.bot-empty {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(244, 240, 223, 0.05);
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .stats-grid {
@@ -510,6 +777,22 @@ details.panel > :not(summary) {
 }
 
 @media (max-width: 900px) {
+  .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-person {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-actions {
+    justify-content: stretch;
+  }
+
+  .lobby-actions > * {
+    flex: 1;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -535,8 +818,14 @@ details.panel > :not(summary) {
 
 @media (max-width: 560px) {
   .main-panel,
-  .sidebar {
+  .sidebar,
+  .lobby-view {
     padding: 16px;
+  }
+
+  .lobby-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .identity-grid,
@@ -544,7 +833,10 @@ details.panel > :not(summary) {
   .character-list,
   .editable-row,
   .effect-main,
-  .item-main {
+  .item-main,
+  .copy-row,
+  .participant-actions,
+  .dm-control-grid {
     grid-template-columns: 1fr;
   }
 
@@ -552,6 +844,11 @@ details.panel > :not(summary) {
   .summon-stats-grid,
   .tracker-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bot-summary-grid,
+  .bot-data-grid {
+    grid-template-columns: 1fr;
   }
 
   .delete-row {

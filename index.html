@@ -3,21 +3,92 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DAMNATUS</title>
-    <link rel="stylesheet" href="./styles.css?v=6" />
+    <title>DAMNATUS 3.0 Firebase</title>
+    <link rel="stylesheet" href="./styles.css?v=30" />
   </head>
   <body>
-    <div class="app-shell">
+    <section id="lobbyView" class="lobby-view" aria-label="Lobby de partida">
+      <div class="lobby-shell">
+        <div class="lobby-header">
+          <span class="brand-mark">DAMNATUS</span>
+          <div>
+            <h1>Lobby de partida</h1>
+            <p>Crea el mundo, confirma al DM, registra jugadores y entra a la partida.</p>
+          </div>
+        </div>
+
+        <div class="lobby-grid">
+          <section class="lobby-panel">
+            <div class="panel-title">
+              <h2>Crear mundo</h2>
+              <span>Solo DM</span>
+            </div>
+            <label>
+              Nombre del mundo o partida
+              <input id="lobbyServerName" type="text" placeholder="Ej: La Cripta de Alt3tlA" />
+            </label>
+            <label>
+              PIN privado
+              <div class="copy-row">
+                <input id="lobbyServerId" type="text" />
+                <button id="generatePinBtn" class="icon-button" type="button" aria-label="Generar PIN">#</button>
+              </div>
+            </label>
+            <label>
+              Nombre del DM
+              <input id="lobbyDmName" type="text" placeholder="Quien organiza la mesa" />
+            </label>
+            <button id="createLobbyBtn" class="small-button primary-button" type="button">Crear y confirmar DM</button>
+          </section>
+
+          <section class="lobby-panel">
+            <div class="panel-title">
+              <h2>Entrar como jugador</h2>
+              <span>Lobby</span>
+            </div>
+            <label>
+              Nombre o PIN de la partida
+              <input id="lobbyJoinTarget" type="text" placeholder="Pide este dato al DM" />
+            </label>
+            <label>
+              Nombre del jugador
+              <input id="lobbyPlayerName" type="text" placeholder="Tu nombre en mesa" />
+            </label>
+            <label>
+              Personaje
+              <select id="lobbyPlayerCharacter"></select>
+            </label>
+            <button id="lobbyAddPlayerBtn" class="small-button" type="button">Unirse al lobby</button>
+          </section>
+
+          <section class="lobby-panel lobby-wide">
+            <div class="panel-title">
+              <h2>Personas activas</h2>
+              <span id="lobbyPeopleCount">0</span>
+            </div>
+            <div id="lobbyPeopleList" class="lobby-people-list"></div>
+            <div class="lobby-actions">
+              <button id="enterGameBtn" class="small-button primary-button" type="button">Entrar a partida</button>
+              <button id="resetLobbyBtn" class="danger-button" type="button">Reiniciar lobby</button>
+            </div>
+            <p id="lobbyStatus" class="table-hint"></p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <div id="gameView" class="app-shell">
       <aside class="sidebar">
         <div class="brand">
           <span class="brand-mark">DAMNATUS</span>
           <div>
-            <h1>DAMNATUS</h1>
-            <p>Gestor de partida persistente</p>
+            <h1>DAMNATUS 3.0</h1>
+            <p>Fichas sincronizadas con bot y Firebase</p>
           </div>
         </div>
 
         <div class="party-tools">
+          <button id="backToLobbyBtn" class="ghost-button" type="button">Volver al lobby</button>
           <button id="addCharacterBtn" class="ghost-button" type="button">Agregar personaje</button>
           <button id="newCampaignBtn" class="ghost-button" type="button">Nueva campaña</button>
           <button id="exportBtn" class="ghost-button" type="button">Exportar</button>
@@ -26,6 +97,51 @@
             <input id="importInput" type="file" accept="application/json" />
           </label>
         </div>
+
+        <section class="table-card" aria-label="Mesa DAMNATUS 3.0">
+          <div class="table-card-heading">
+            <span>Mesa 3.0</span>
+            <strong id="connectionStatus">Local</strong>
+          </div>
+          <label>
+            Nombre del servidor
+            <input id="serverName" type="text" placeholder="Ej: La Cripta de Alt3tlA" />
+          </label>
+          <label>
+            ID de mesa
+            <div class="copy-row">
+              <input id="serverId" type="text" readonly />
+              <button id="copyServerIdBtn" class="icon-button" type="button" aria-label="Copiar ID">#</button>
+            </div>
+          </label>
+          <label>
+            Conectarse por ID/IP
+            <div class="copy-row">
+              <input id="joinTarget" type="text" placeholder="Nombre, ID o IP del DM" />
+              <button id="joinServerBtn" class="icon-button" type="button" aria-label="Guardar conexion">+</button>
+            </div>
+          </label>
+          <label>
+            Nombre de persona
+            <input id="participantName" type="text" placeholder="Nombre del DM o jugador" />
+          </label>
+          <label>
+            Personaje asignado
+            <select id="participantCharacter"></select>
+          </label>
+          <div class="participant-actions">
+            <button id="confirmDmBtn" class="small-button" type="button">Confirmar DM</button>
+            <button id="addPlayerBtn" class="small-button" type="button">Registrar jugador</button>
+          </div>
+          <div class="active-people">
+            <div class="active-people-heading">
+              <span>Personas activas</span>
+              <strong id="activePeopleCount">0</strong>
+            </div>
+            <div id="activePeopleList" class="active-people-list"></div>
+          </div>
+          <p id="connectionHint" class="table-hint"></p>
+        </section>
 
         <nav id="characterList" class="character-list" aria-label="Personajes"></nav>
       </aside>
@@ -54,6 +170,13 @@
               <input id="characterLevel" type="number" min="1" max="99" />
             </label>
             <label>
+              Permiso de nivel
+              <select id="levelPermission">
+                <option value="locked">Bloqueado por DM</option>
+                <option value="open">Subida permitida</option>
+              </select>
+            </label>
+            <label>
               Dificultad
               <select id="difficulty">
                 <option value="normal">Normal</option>
@@ -61,6 +184,7 @@
                 <option value="pesadilla">Pesadilla</option>
               </select>
             </label>
+            <button id="levelUpBtn" class="small-button" type="button">Subir nivel aprobado</button>
             <button id="deleteCharacterBtn" class="danger-button" type="button">Eliminar personaje</button>
           </div>
         </section>
@@ -93,6 +217,58 @@
               <button id="endTurnBtn" class="small-button" type="button">Finalizar turno</button>
               <button id="endDungeonBtn" class="danger-button" type="button">Finalizar mazmorra</button>
             </div>
+          </details>
+
+          <details class="panel bot-panel" open>
+            <summary class="panel-heading">
+              <h2>Bot Discord</h2>
+              <span>Inventario y economia</span>
+            </summary>
+            <div class="bot-summary-grid">
+              <div class="tracker-card">
+                <span>Cobre</span>
+                <strong id="botCopper">0</strong>
+              </div>
+              <div class="tracker-card">
+                <span>Estados</span>
+                <strong id="botStatesCount">0</strong>
+              </div>
+            </div>
+            <div class="bot-data-grid">
+              <div>
+                <h3>Inventario del bot</h3>
+                <div id="botInventoryList" class="bot-data-list"></div>
+              </div>
+              <div>
+                <h3>Historial reciente</h3>
+                <div id="botHistoryList" class="bot-data-list"></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="panel dm-panel" open>
+            <summary class="panel-heading">
+              <h2>Control DM</h2>
+              <span>Niveles y conexion</span>
+            </summary>
+            <div class="dm-control-grid">
+              <label>
+                Nivel maximo permitido
+                <input id="partyLevelCap" type="number" min="1" max="99" />
+              </label>
+              <label>
+                Subida global
+                <select id="globalLevelPermission">
+                  <option value="locked">Bloqueada</option>
+                  <option value="open">Permitida</option>
+                </select>
+              </label>
+            </div>
+            <div class="section-actions split-actions">
+              <button id="approveActiveLevelBtn" class="small-button" type="button">Aprobar activo</button>
+              <button id="syncPartyLevelBtn" class="small-button" type="button">Igualar al maximo</button>
+            </div>
+            <p id="dmControlHint" class="table-hint"></p>
           </details>
 
           <details class="panel notes-panel">
@@ -197,6 +373,9 @@
       </article>
     </template>
 
-    <script src="./app.js?v=6"></script>
+    <script src="./firebase-config.js?v=30"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+    <script defer src="./app.js?v=30"></script>
   </body>
 </html>

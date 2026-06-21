@@ -1,4 +1,5 @@
-const STORAGE_KEY = "damnatus-v4";
+const STORAGE_KEY = "damnatus-v30-firebase";
+const CAMPAIGN_ID = window.DAMNATUS_CAMPAIGN_ID || "damnatus";
 const STATS = ["FUERZA", "DESTREZA", "RESISTENCIA", "INTELIGENCIA", "CARISMA", "VIDA", "MANÁ"];
 const CLASSES = ["Guerrero", "Caballero", "Pícaro", "Arquero", "Mago", "Sacerdote", "Invocador"];
 const LEVELS = ["I", "II", "III", "IV", "V"];
@@ -9,6 +10,17 @@ const starterPortrait =
 let state = normalizeState(loadState());
 let activeId = state.activeId;
 let saveTimer;
+let onlineSaveTimer;
+let onlineSync = {
+  app: null,
+  db: null,
+  roomRef: null,
+  roomKey: CAMPAIGN_ID,
+  campaign: null,
+  enabled: false,
+  applyingRemote: false,
+  lastWriteId: ""
+};
 
 const els = {
   characterList: document.querySelector("#characterList"),
@@ -27,10 +39,52 @@ const els = {
   roundCounter: document.querySelector("#roundCounter"),
   dungeonCounter: document.querySelector("#dungeonCounter"),
   saveStatus: document.querySelector("#saveStatus"),
+  serverName: document.querySelector("#serverName"),
+  serverId: document.querySelector("#serverId"),
+  joinTarget: document.querySelector("#joinTarget"),
+  participantName: document.querySelector("#participantName"),
+  participantCharacter: document.querySelector("#participantCharacter"),
+  confirmDmBtn: document.querySelector("#confirmDmBtn"),
+  addPlayerBtn: document.querySelector("#addPlayerBtn"),
+  activePeopleCount: document.querySelector("#activePeopleCount"),
+  activePeopleList: document.querySelector("#activePeopleList"),
+  connectionStatus: document.querySelector("#connectionStatus"),
+  connectionHint: document.querySelector("#connectionHint"),
+  levelPermission: document.querySelector("#levelPermission"),
+  levelUpBtn: document.querySelector("#levelUpBtn"),
+  partyLevelCap: document.querySelector("#partyLevelCap"),
+  globalLevelPermission: document.querySelector("#globalLevelPermission"),
+  approveActiveLevelBtn: document.querySelector("#approveActiveLevelBtn"),
+  syncPartyLevelBtn: document.querySelector("#syncPartyLevelBtn"),
+  dmControlHint: document.querySelector("#dmControlHint"),
+  botCopper: document.querySelector("#botCopper"),
+  botStatesCount: document.querySelector("#botStatesCount"),
+  botInventoryList: document.querySelector("#botInventoryList"),
+  botHistoryList: document.querySelector("#botHistoryList"),
   effectTemplate: document.querySelector("#effectTemplate"),
   itemTemplate: document.querySelector("#itemTemplate"),
   summonTemplate: document.querySelector("#summonTemplate")
 };
+
+Object.assign(els, {
+  lobbyView: document.querySelector("#lobbyView"),
+  gameView: document.querySelector("#gameView"),
+  lobbyServerName: document.querySelector("#lobbyServerName"),
+  lobbyServerId: document.querySelector("#lobbyServerId"),
+  lobbyDmName: document.querySelector("#lobbyDmName"),
+  lobbyJoinTarget: document.querySelector("#lobbyJoinTarget"),
+  lobbyPlayerName: document.querySelector("#lobbyPlayerName"),
+  lobbyPlayerCharacter: document.querySelector("#lobbyPlayerCharacter"),
+  lobbyPeopleCount: document.querySelector("#lobbyPeopleCount"),
+  lobbyPeopleList: document.querySelector("#lobbyPeopleList"),
+  lobbyStatus: document.querySelector("#lobbyStatus"),
+  createLobbyBtn: document.querySelector("#createLobbyBtn"),
+  generatePinBtn: document.querySelector("#generatePinBtn"),
+  lobbyAddPlayerBtn: document.querySelector("#lobbyAddPlayerBtn"),
+  enterGameBtn: document.querySelector("#enterGameBtn"),
+  resetLobbyBtn: document.querySelector("#resetLobbyBtn"),
+  backToLobbyBtn: document.querySelector("#backToLobbyBtn")
+});
 
 function emptyBonuses() {
   return Object.fromEntries(STATS.map((stat) => [stat, 0]));
@@ -77,21 +131,48 @@ function defaultCharacter(index = 0) {
     round: 0,
     dungeon: 0,
     portrait: starterPortrait,
-    stats: Object.fromEntries(STATS.map((stat) => [stat, 8])),
+    stats: Object.fromEntries(STATS.map((stat) => [stat, 0])),
     personalSkills: Array.from({ length: 10 }, (_, skillIndex) => defaultEffect(skillIndex, "Habilidad")),
     uniqueSkills: Array.from({ length: 3 }, (_, skillIndex) => defaultEffect(skillIndex, "Única")),
     items: [defaultItem(0)],
     summons: [],
-    notes: ""
+    notes: "",
+    cobre: 0,
+    inventory: [],
+    history: [],
+    states: [],
+    ownerDiscordId: ""
   };
 }
 
 function defaultState() {
   const character = defaultCharacter(0);
   return {
+    table: defaultTable(),
     activeId: character.id,
     characters: [character]
   };
+}
+
+function defaultTable() {
+  return {
+    serverName: "Mesa DAMNATUS",
+    serverId: createServerId(),
+    joinTarget: "",
+    view: "lobby",
+    role: "dm",
+    dmConfirmed: false,
+    participants: [],
+    onlineStatus: "local",
+    levelPermission: "locked",
+    levelCap: 1,
+    lastConnectionNote: "Modo local: listo para exportar/importar. La conexion online real necesita un servidor externo."
+  };
+}
+
+function createServerId() {
+  const randomPart = crypto.randomUUID().slice(0, 8).toUpperCase();
+  return `DMN-${randomPart}`;
 }
 
 function loadState() {
@@ -106,6 +187,7 @@ function loadState() {
 function normalizeState(rawState) {
   const base = rawState && Array.isArray(rawState.characters) ? rawState : defaultState();
   if (!base.characters.length) base.characters.push(defaultCharacter(0));
+  base.table = normalizeTable(base.table, base.characters);
 
   const oldClassMap = {
     Exploradora: "Caballero",
@@ -132,11 +214,64 @@ function normalizeState(rawState) {
     character.uniqueSkills = (character.uniqueSkills || []).map((effect, effectIndex) => normalizeEffect(effect, effectIndex, "Única"));
     character.items = (character.items || []).map((item, itemIndex) => normalizeItem(item, itemIndex));
     character.summons = (character.summons || []).map((summon, summonIndex) => normalizeSummon(summon, summonIndex));
+    character.cobre = Number(character.cobre || 0);
+    character.inventory = Array.isArray(character.inventory) ? character.inventory : [];
+    character.history = Array.isArray(character.history) ? character.history : [];
+    character.states = Array.isArray(character.states) ? character.states : [];
+    character.ownerDiscordId = character.ownerDiscordId || "";
     while (character.personalSkills.length < 10) character.personalSkills.push(defaultEffect(character.personalSkills.length, "Habilidad"));
   });
 
   base.activeId = base.activeId || base.characters[0].id;
   return base;
+}
+
+function normalizeTable(table = {}, characters = []) {
+  const maxLevel = Math.max(1, ...characters.map((character) => Number(character.level || 1)));
+  const normalized = {
+    ...defaultTable(),
+    ...table
+  };
+  normalized.serverName = normalized.serverName || "Mesa DAMNATUS";
+  normalized.serverId = normalized.serverId || createServerId();
+  normalized.joinTarget = normalized.joinTarget || "";
+  normalized.view = ["lobby", "game"].includes(normalized.view) ? normalized.view : "lobby";
+  normalized.role = ["dm", "player"].includes(normalized.role) ? normalized.role : "dm";
+  normalized.onlineStatus = ["local", "online", "offline"].includes(normalized.onlineStatus) ? normalized.onlineStatus : "local";
+  normalized.dmConfirmed = Boolean(normalized.dmConfirmed);
+  normalized.participants = normalizeParticipants(normalized.participants, characters);
+  if (normalized.participants.some((participant) => participant.role === "dm")) {
+    normalized.dmConfirmed = true;
+  }
+  normalized.levelPermission = ["locked", "open"].includes(normalized.levelPermission) ? normalized.levelPermission : "locked";
+  normalized.levelCap = Math.max(1, Number(normalized.levelCap || maxLevel));
+  normalized.lastConnectionNote = normalized.lastConnectionNote || "Modo local: listo para exportar/importar. La conexion online real necesita un servidor externo.";
+  return normalized;
+}
+
+function normalizeParticipants(participants = [], characters = []) {
+  const characterIds = new Set(characters.map((character) => character.id));
+  const clean = Array.isArray(participants) ? participants : [];
+  const normalized = clean.map((participant, index) => ({
+    id: participant.id || crypto.randomUUID(),
+    name: participant.name || `Persona ${index + 1}`,
+    role: participant.role === "dm" ? "dm" : "player",
+    characterId: characterIds.has(participant.characterId) ? participant.characterId : "",
+    active: participant.active !== false,
+    confirmed: participant.confirmed !== false
+  }));
+  const firstDm = normalized.find((participant) => participant.role === "dm");
+  normalized.forEach((participant) => {
+    if (participant.role === "dm" && participant !== firstDm) participant.role = "player";
+  });
+  return sortParticipants(normalized);
+}
+
+function sortParticipants(participants) {
+  return [...participants].sort((a, b) => {
+    if (a.role === b.role) return 0;
+    return a.role === "dm" ? -1 : 1;
+  });
 }
 
 function normalizeStats(stats = {}) {
@@ -207,6 +342,253 @@ function saveState() {
   saveTimer = setTimeout(() => {
     els.saveStatus.textContent = "Guardado";
   }, 350);
+  scheduleOnlineSave();
+}
+
+function hasFirebaseConfig() {
+  const config = window.DAMNATUS_FIREBASE_CONFIG || {};
+  return Boolean(config.databaseURL && config.projectId);
+}
+
+function getRoomKey() {
+  const raw = state.table.serverId || state.table.serverName || "damnatus";
+  return slugifyRoom(raw);
+}
+
+function slugifyRoom(raw) {
+  return String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "damnatus";
+}
+
+async function loadOnlineRoom(rawTarget) {
+  if (!onlineSync.enabled || !onlineSync.db) return false;
+  const roomKey = slugifyRoom(rawTarget || CAMPAIGN_ID);
+  const snapshot = await onlineSync.db.ref(`campaigns/${roomKey}`).once("value");
+  const remote = snapshot.val();
+  if (!remote?.characters) return false;
+  onlineSync.applyingRemote = true;
+  onlineSync.campaign = remote;
+  state = campaignToState(remote);
+  state.table.joinTarget = rawTarget;
+  activeId = state.activeId || state.characters[0].id;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  onlineSync.applyingRemote = false;
+  connectOnlineRoom(true);
+  render();
+  return true;
+}
+
+function initOnlineSync() {
+  if (!hasFirebaseConfig()) {
+    state.table.onlineStatus = "local";
+    state.table.lastConnectionNote = state.table.lastConnectionNote || "Modo local: agrega Firebase para sincronizar online.";
+    return;
+  }
+  if (!window.firebase?.initializeApp || !window.firebase?.database) {
+    state.table.onlineStatus = "offline";
+    state.table.lastConnectionNote = "Firebase no cargo. Revisa conexion a internet o los scripts de Firebase.";
+    return;
+  }
+  try {
+    onlineSync.app = window.firebase.apps?.length
+      ? window.firebase.app()
+      : window.firebase.initializeApp(window.DAMNATUS_FIREBASE_CONFIG);
+    onlineSync.db = window.firebase.database();
+    onlineSync.enabled = true;
+    connectOnlineRoom();
+  } catch (error) {
+    onlineSync.enabled = false;
+    state.table.onlineStatus = "offline";
+    state.table.lastConnectionNote = `No se pudo iniciar Firebase: ${error.message}`;
+  }
+}
+
+function connectOnlineRoom(force = false) {
+  if (!onlineSync.enabled || !onlineSync.db) return;
+  const roomKey = CAMPAIGN_ID;
+  if (!force && onlineSync.roomRef && onlineSync.roomKey === roomKey) return;
+
+  if (onlineSync.roomRef) onlineSync.roomRef.off();
+  onlineSync.roomKey = roomKey;
+  onlineSync.roomRef = onlineSync.db.ref(`campaigns/${roomKey}`);
+  state.table.onlineStatus = "online";
+  state.table.serverId = CAMPAIGN_ID;
+  state.table.serverName = "DAMNATUS";
+  state.table.lastConnectionNote = `Online: sincronizando campana ${roomKey}.`;
+
+  onlineSync.roomRef.on("value", (snapshot) => {
+    const remote = snapshot.val();
+    if (!remote?.characters || remote.writeId === onlineSync.lastWriteId) return;
+    onlineSync.applyingRemote = true;
+    onlineSync.campaign = remote;
+    state = campaignToState(remote);
+    activeId = state.activeId || state.characters[0].id;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    onlineSync.applyingRemote = false;
+    render();
+  });
+
+  onlineSync.roomRef.once("value").then((snapshot) => {
+    if (!snapshot.exists()) pushOnlineState();
+  });
+}
+
+function scheduleOnlineSave() {
+  if (!onlineSync.enabled || !onlineSync.roomRef || onlineSync.applyingRemote) return;
+  clearTimeout(onlineSaveTimer);
+  onlineSaveTimer = setTimeout(pushOnlineState, 500);
+}
+
+function pushOnlineState() {
+  if (!onlineSync.enabled || !onlineSync.roomRef || onlineSync.applyingRemote) return;
+  onlineSync.lastWriteId = crypto.randomUUID();
+  const patch = stateToCampaignPatch(state, onlineSync.campaign || {});
+  onlineSync.roomRef.update({
+    ...patch,
+    writeId: onlineSync.lastWriteId,
+    updatedAt: Date.now()
+  }).catch((error) => {
+    state.table.onlineStatus = "offline";
+    state.table.lastConnectionNote = `No se pudo sincronizar online: ${error.message}`;
+    renderTableControls();
+    renderLobby();
+  });
+}
+
+function campaignToState(campaign) {
+  const characters = Object.values(campaign.characters || {}).map((character, index) => campaignCharacterToWebCharacter(character, index));
+  const table = {
+    ...defaultTable(),
+    serverName: campaign.meta?.name || "DAMNATUS",
+    serverId: CAMPAIGN_ID,
+    joinTarget: CAMPAIGN_ID,
+    view: state?.table?.view || "game",
+    role: state?.table?.role || "dm",
+    dmConfirmed: true,
+    participants: campaignPlayersToParticipants(campaign.players || {}, campaign.characters || {}),
+    onlineStatus: "online",
+    levelPermission: campaign.meta?.levelPermission || "locked",
+    levelCap: Number(campaign.meta?.levelCap || 1),
+    lastConnectionNote: `Online: campana ${CAMPAIGN_ID} sincronizada con Firebase.`
+  };
+  return normalizeState({
+    table,
+    activeId: activeId && characters.some((character) => character.id === activeId) ? activeId : characters[0]?.id,
+    characters: characters.length ? characters : [defaultCharacter(0)]
+  });
+}
+
+function campaignCharacterToWebCharacter(character, index) {
+  const base = defaultCharacter(index);
+  return {
+    ...base,
+    ...character,
+    id: character.id || `char_${character.ownerDiscordId || index}`,
+    name: character.name || base.name,
+    className: character.className || base.className,
+    level: Number(character.level || 1),
+    portrait: character.portrait || base.portrait,
+    stats: character.stats || base.stats,
+    personalSkills: character.personalSkills || base.personalSkills,
+    uniqueSkills: character.uniqueSkills || base.uniqueSkills,
+    items: character.items || base.items,
+    summons: character.summons || [],
+    notes: character.notes || "",
+    cobre: Number(character.cobre || 0),
+    inventory: Array.isArray(character.inventory) ? character.inventory : [],
+    history: Array.isArray(character.history) ? character.history : [],
+    states: Array.isArray(character.states) ? character.states : []
+  };
+}
+
+function campaignPlayersToParticipants(players, characters) {
+  return Object.values(players).map((player, index) => {
+    const character = characters[player.characterId] || {};
+    return {
+      id: player.discordId || crypto.randomUUID(),
+      name: player.displayName || character.name || `Jugador ${index + 1}`,
+      role: player.role === "dm" ? "dm" : "player",
+      characterId: player.characterId || "",
+      active: true,
+      confirmed: true
+    };
+  });
+}
+
+function stateToCampaignPatch(nextState, previousCampaign = {}) {
+  const now = new Date().toISOString();
+  const previousCharacters = previousCampaign.characters || {};
+  const previousPlayers = previousCampaign.players || {};
+  const characters = {};
+  const players = { ...previousPlayers };
+
+  nextState.characters.forEach((character) => {
+    const previous = previousCharacters[character.id] || {};
+    const ownerDiscordId = character.ownerDiscordId || previous.ownerDiscordId || extractDiscordIdFromCharacterId(character.id);
+    characters[character.id] = {
+      ...previous,
+      ...character,
+      ownerDiscordId,
+      cobre: Number(character.cobre || previous.cobre || 0),
+      inventory: character.inventory || previous.inventory || [],
+      history: character.history || previous.history || [],
+      states: character.states || previous.states || [],
+      updatedAt: now
+    };
+
+    if (ownerDiscordId) {
+      players[ownerDiscordId] = {
+        ...(players[ownerDiscordId] || {}),
+        discordId: ownerDiscordId,
+        displayName: character.name,
+        characterId: character.id,
+        role: players[ownerDiscordId]?.role || "player",
+        joinedAt: players[ownerDiscordId]?.joinedAt || now
+      };
+    }
+  });
+
+  return {
+    meta: {
+      ...(previousCampaign.meta || {}),
+      name: nextState.table.serverName || "DAMNATUS",
+      updatedAt: now,
+      dmDiscordId: previousCampaign.meta?.dmDiscordId || "1101193970970800248",
+      levelPermission: nextState.table.levelPermission || "locked",
+      levelCap: Number(nextState.table.levelCap || 1)
+    },
+    players,
+    characters,
+    sessions: previousCampaign.sessions || {
+      active: {
+        id: "active",
+        name: "Sesion actual",
+        createdAt: now,
+        status: "open",
+        currentMapId: "map_main"
+      }
+    },
+    events: previousCampaign.events || {},
+    maps: previousCampaign.maps || {
+      map_main: {
+        id: "map_main",
+        name: "Mapa actual",
+        gridSize: 24,
+        notes: "",
+        tokens: {},
+        rooms: {}
+      }
+    }
+  };
+}
+
+function extractDiscordIdFromCharacterId(characterId) {
+  const match = String(characterId || "").match(/^char_(\d+)$/);
+  return match ? match[1] : "";
 }
 
 function renderClassOptions() {
@@ -241,8 +623,320 @@ function renderTrackers() {
   els.dungeonCounter.textContent = character.dungeon;
 }
 
+function isDm() {
+  return state.table.dmConfirmed && state.table.role === "dm";
+}
+
+function canEditLevel() {
+  return isDm() || state.table.levelPermission === "open";
+}
+
+function canEditStats() {
+  return isDm() || state.table.levelPermission === "open";
+}
+
+function renderTableControls() {
+  const table = state.table;
+  const character = currentCharacter();
+  const dmMode = isDm();
+  const levelOpen = table.levelPermission === "open";
+  const dmParticipant = table.participants.find((participant) => participant.role === "dm");
+
+  els.serverName.value = table.serverName;
+  els.serverId.value = table.serverId;
+  els.joinTarget.value = table.joinTarget;
+  els.connectionStatus.textContent = table.onlineStatus === "online"
+    ? "Online"
+    : table.dmConfirmed
+      ? "DM confirmado"
+      : table.joinTarget
+        ? "Vinculo guardado"
+        : "Local";
+  els.connectionHint.textContent = table.lastConnectionNote;
+  renderParticipantCharacterOptions();
+  renderActivePeople();
+  els.confirmDmBtn.disabled = table.dmConfirmed;
+  els.addPlayerBtn.disabled = !table.dmConfirmed;
+
+  els.levelPermission.value = table.levelPermission;
+  els.levelPermission.disabled = !dmMode;
+  els.globalLevelPermission.value = table.levelPermission;
+  els.globalLevelPermission.disabled = !dmMode;
+  els.partyLevelCap.value = table.levelCap;
+  els.partyLevelCap.disabled = !dmMode;
+
+  els.characterLevel.disabled = !canEditLevel();
+  els.levelUpBtn.disabled = !levelOpen && !dmMode;
+  els.approveActiveLevelBtn.disabled = !dmMode;
+  els.syncPartyLevelBtn.disabled = !dmMode;
+  els.dmControlHint.textContent = dmMode
+    ? `DM activo: ${dmParticipant?.name || "sin nombre"} controla la mesa. ${character.name} puede llegar hasta nivel ${table.levelCap}.`
+    : levelOpen
+      ? `Jugador: el DM abrio la subida hasta nivel ${table.levelCap}.`
+      : table.dmConfirmed
+        ? `Jugador: la subida de nivel esta bloqueada por el DM.`
+        : `Primero confirma quien sera el DM de esta mesa.`;
+}
+
+function renderParticipantCharacterOptions() {
+  const currentValue = els.participantCharacter.value;
+  els.participantCharacter.innerHTML = "";
+
+  const noCharacter = document.createElement("option");
+  noCharacter.value = "";
+  noCharacter.textContent = "Sin personaje";
+  els.participantCharacter.append(noCharacter);
+
+  state.characters.forEach((character) => {
+    const option = document.createElement("option");
+    option.value = character.id;
+    option.textContent = `${character.name} - ${character.className} nivel ${character.level}`;
+    els.participantCharacter.append(option);
+  });
+
+  if ([...els.participantCharacter.options].some((option) => option.value === currentValue)) {
+    els.participantCharacter.value = currentValue;
+  } else {
+    els.participantCharacter.value = "";
+  }
+}
+
+function renderActivePeople() {
+  const participants = sortParticipants(state.table.participants);
+  state.table.participants = participants;
+  els.activePeopleCount.textContent = participants.length;
+  els.activePeopleList.innerHTML = "";
+
+  if (!participants.length) {
+    const empty = document.createElement("p");
+    empty.className = "table-hint";
+    empty.textContent = "Sin DM confirmado. El primero en registrarse debe ser el DM.";
+    els.activePeopleList.append(empty);
+    return;
+  }
+
+  participants.forEach((participant) => {
+    const character = state.characters.find((item) => item.id === participant.characterId);
+    const row = document.createElement("article");
+    row.className = `active-person ${participant.role}`;
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(participant.name)}</strong>
+        <span>${participant.role === "dm" ? "DM" : "Jugador"} · ${character ? `${escapeHtml(character.name)} · Nivel ${character.level}` : "Sin personaje"}</span>
+      </div>
+      <span class="active-dot">${participant.active ? "Activo" : "Ausente"}</span>
+    `;
+    els.activePeopleList.append(row);
+  });
+}
+
+function renderLobby() {
+  const table = state.table;
+  els.lobbyServerName.value = table.serverName;
+  els.lobbyServerId.value = table.serverId;
+  els.lobbyJoinTarget.value = table.joinTarget;
+  renderLobbyCharacterOptions();
+  renderLobbyPeople();
+  els.lobbyAddPlayerBtn.disabled = !table.dmConfirmed && !hasFirebaseConfig();
+  els.enterGameBtn.disabled = !table.dmConfirmed;
+  els.lobbyStatus.textContent = table.dmConfirmed
+    ? `Mundo "${table.serverName}" listo. PIN: ${table.serverId}. ${getOnlineStatusLabel()}.`
+    : `Primero el DM crea el mundo y confirma su rol. ${getOnlineStatusLabel()}.`;
+}
+
+function getOnlineStatusLabel() {
+  if (state.table.onlineStatus === "online") return "Online activo";
+  if (state.table.onlineStatus === "offline") return "Online con error";
+  return hasFirebaseConfig() ? "Online pendiente" : "Modo local";
+}
+
+function renderLobbyCharacterOptions() {
+  const currentValue = els.lobbyPlayerCharacter.value;
+  els.lobbyPlayerCharacter.innerHTML = "";
+  const noCharacter = document.createElement("option");
+  noCharacter.value = "";
+  noCharacter.textContent = "Sin personaje";
+  els.lobbyPlayerCharacter.append(noCharacter);
+
+  state.characters.forEach((character) => {
+    const option = document.createElement("option");
+    option.value = character.id;
+    option.textContent = `${character.name} - ${character.className} nivel ${character.level}`;
+    els.lobbyPlayerCharacter.append(option);
+  });
+
+  if ([...els.lobbyPlayerCharacter.options].some((option) => option.value === currentValue)) {
+    els.lobbyPlayerCharacter.value = currentValue;
+  }
+}
+
+function renderLobbyPeople() {
+  const participants = sortParticipants(state.table.participants);
+  els.lobbyPeopleCount.textContent = participants.length;
+  els.lobbyPeopleList.innerHTML = "";
+
+  if (!participants.length) {
+    const empty = document.createElement("p");
+    empty.className = "table-hint";
+    empty.textContent = "Aun no hay personas activas. El primer registro debe ser el DM.";
+    els.lobbyPeopleList.append(empty);
+    return;
+  }
+
+  participants.forEach((participant) => {
+    const character = state.characters.find((item) => item.id === participant.characterId);
+    const card = document.createElement("article");
+    card.className = `lobby-person ${participant.role}`;
+    card.innerHTML = `
+      <div>
+        <strong>${escapeHtml(participant.name)}</strong>
+        <span>${participant.role === "dm" ? "DM" : "Jugador"}</span>
+      </div>
+      <div>
+        <strong>${character ? escapeHtml(character.name) : "Sin personaje"}</strong>
+        <span>${character ? `Nivel ${character.level}` : "Pendiente"}</span>
+      </div>
+      <span class="active-dot">${participant.active ? "Activo" : "Ausente"}</span>
+    `;
+    els.lobbyPeopleList.append(card);
+  });
+}
+
+function setView(view) {
+  state.table.view = view;
+  saveState();
+  render();
+}
+
+function createLobbyFromDm() {
+  const dmName = els.lobbyDmName.value.trim();
+  const serverName = els.lobbyServerName.value.trim();
+  const serverId = els.lobbyServerId.value.trim();
+  if (!serverName || !serverId || !dmName) {
+    alert("Completa nombre de mundo, PIN y nombre del DM.");
+    return;
+  }
+  state.table.serverName = serverName;
+  state.table.serverId = serverId;
+  state.table.joinTarget = serverId;
+  state.table.participants = [{
+    id: crypto.randomUUID(),
+    name: dmName,
+    role: "dm",
+    characterId: "",
+    active: true,
+    confirmed: true
+  }];
+  state.table.dmConfirmed = true;
+  state.table.role = "dm";
+  state.table.lastConnectionNote = `${dmName} organizo el mundo "${serverName}".`;
+  connectOnlineRoom(true);
+  saveState();
+  render();
+}
+
+async function addLobbyPlayer() {
+  const target = els.lobbyJoinTarget.value.trim();
+  const name = els.lobbyPlayerName.value.trim();
+  if (!target || !name) {
+    alert("Escribe el PIN/nombre de partida y el nombre del jugador.");
+    return;
+  }
+  if (!state.table.dmConfirmed && onlineSync.enabled) {
+    const loaded = await loadOnlineRoom(target);
+    if (!loaded) {
+      alert("No encontre una partida online con ese PIN. Revisa el dato que te dio el DM.");
+      return;
+    }
+  }
+  if (!state.table.dmConfirmed) {
+    alert("Primero el DM debe crear el mundo.");
+    return;
+  }
+  const validTarget = target === state.table.serverId || target.toLowerCase() === state.table.serverName.toLowerCase();
+  if (!validTarget) {
+    alert("Ese PIN o nombre de partida no coincide con el mundo creado por el DM.");
+    return;
+  }
+  state.table.joinTarget = target;
+  state.table.participants.push({
+    id: crypto.randomUUID(),
+    name,
+    role: "player",
+    characterId: els.lobbyPlayerCharacter.value,
+    active: true,
+    confirmed: true
+  });
+  state.table.lastConnectionNote = `${name} entro al lobby como jugador.`;
+  els.lobbyPlayerName.value = "";
+  saveState();
+  render();
+}
+
+function addParticipant(role) {
+  const name = els.participantName.value.trim();
+  if (!name) {
+    alert("Escribe el nombre de la persona antes de registrarla.");
+    return;
+  }
+  if (role === "dm" && state.table.dmConfirmed) {
+    alert("Esta mesa ya tiene DM confirmado.");
+    return;
+  }
+  if (role === "player" && !state.table.dmConfirmed) {
+    alert("Primero debe confirmarse el DM.");
+    return;
+  }
+
+  const participant = {
+    id: crypto.randomUUID(),
+    name,
+    role,
+    characterId: els.participantCharacter.value,
+    active: true,
+    confirmed: true
+  };
+
+  if (role === "dm") {
+    state.table.participants = [participant, ...state.table.participants.filter((item) => item.role !== "dm")];
+    state.table.dmConfirmed = true;
+    state.table.role = "dm";
+    state.table.lastConnectionNote = `${name} fue confirmado como DM. Ahora pueden registrarse jugadores.`;
+  } else {
+    state.table.participants.push(participant);
+    state.table.lastConnectionNote = `${name} fue registrado como jugador activo.`;
+  }
+
+  els.participantName.value = "";
+  saveState();
+  render();
+}
+
+function setLevelPermission(value) {
+  state.table.levelPermission = value;
+  saveState();
+  render();
+}
+
+function raiseCharacterLevel(character) {
+  const nextLevel = Number(character.level || 1) + 1;
+  const cap = Math.max(1, Number(state.table.levelCap || 1));
+  if (!isDm() && state.table.levelPermission !== "open") {
+    alert("El DM todavia no habilito la subida de nivel.");
+    return;
+  }
+  if (nextLevel > cap) {
+    alert(`El limite actual de la mesa es nivel ${cap}.`);
+    return;
+  }
+  character.level = nextLevel;
+  saveState();
+  render();
+}
+
 function renderStats(character) {
   const bonuses = getTotalBonuses(character);
+  const statsEditable = canEditStats();
   els.statsGrid.innerHTML = "";
   STATS.forEach((stat) => {
     const baseValue = Number(character.stats[stat] || 0);
@@ -263,19 +957,35 @@ function renderStats(character) {
       </div>
     `;
     const [down, input, up] = card.querySelectorAll("button, input");
+    down.disabled = !statsEditable;
+    input.disabled = !statsEditable;
+    up.disabled = !statsEditable;
     down.addEventListener("click", () => {
+      if (!canEditStats()) {
+        alert("El DM todavia no habilito cambios de estadisticas.");
+        return;
+      }
       input.value = Number(input.value || 0) - 1;
       character.stats[stat] = Number(input.value);
       saveState();
       renderStats(character);
     });
     up.addEventListener("click", () => {
+      if (!canEditStats()) {
+        alert("El DM todavia no habilito cambios de estadisticas.");
+        return;
+      }
       input.value = Number(input.value || 0) + 1;
       character.stats[stat] = Number(input.value);
       saveState();
       renderStats(character);
     });
     input.addEventListener("input", () => {
+      if (!canEditStats()) {
+        input.value = character.stats[stat];
+        alert("El DM todavia no habilito cambios de estadisticas.");
+        return;
+      }
       const currentBase = Number(input.value || 0);
       character.stats[stat] = currentBase;
       card.querySelector(".stat-label strong").textContent = currentBase + bonusValue;
@@ -437,6 +1147,41 @@ function renderBonusInputs(container, bonuses, onChange) {
   });
 }
 
+function renderBotPanel(character) {
+  els.botCopper.textContent = Number(character.cobre || 0).toLocaleString("es-AR");
+  els.botStatesCount.textContent = Array.isArray(character.states) ? character.states.length : 0;
+  renderBotList(
+    els.botInventoryList,
+    character.inventory || [],
+    (item) => `${item.nombre || item.title || item.id || "Objeto"}${item.tipo ? ` (${item.tipo})` : ""}`,
+    "Inventario vacio."
+  );
+  renderBotList(
+    els.botHistoryList,
+    (character.history || []).slice(-6).reverse(),
+    (entry) => `${entry.accion || "Evento"}${Number(entry.precio || 0) ? ` - ${entry.precio} cobre` : ""}`,
+    "Sin historial."
+  );
+}
+
+function renderBotList(container, rows, formatter, emptyText) {
+  container.innerHTML = "";
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "bot-empty";
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  rows.forEach((row) => {
+    const item = document.createElement("div");
+    item.className = "bot-data-row";
+    item.textContent = formatter(row);
+    container.append(item);
+  });
+}
+
 function getAvailability(effect) {
   const character = currentCharacter();
   if (effect.cooldownType === "rounds") {
@@ -477,6 +1222,10 @@ function useEffect(effect) {
 function render() {
   const character = currentCharacter();
   activeId = character.id;
+  document.body.dataset.view = state.table.view;
+  els.lobbyView.hidden = state.table.view !== "lobby";
+  els.gameView.hidden = state.table.view !== "game";
+  renderLobby();
 
   renderTrackers();
   renderCharacterList();
@@ -486,28 +1235,83 @@ function render() {
   els.characterLevel.value = character.level;
   els.difficulty.value = character.difficulty;
   els.campaignNotes.value = character.notes || "";
+  renderTableControls();
   renderStats(character);
   renderEffectRows(els.personalSkills, character.personalSkills, "Habilidad");
   renderEffectRows(els.uniqueSkills, character.uniqueSkills, "Habilidad única");
   renderItemRows(character);
   renderSummons(character);
+  renderBotPanel(character);
 }
 
 function bindInputs() {
+  els.generatePinBtn.addEventListener("click", () => {
+    els.lobbyServerId.value = createServerId();
+  });
+  els.createLobbyBtn.addEventListener("click", createLobbyFromDm);
+  els.lobbyAddPlayerBtn.addEventListener("click", addLobbyPlayer);
+  els.enterGameBtn.addEventListener("click", () => {
+    if (!state.table.dmConfirmed) {
+      alert("Primero confirma al DM en el lobby.");
+      return;
+    }
+    setView("game");
+  });
+  els.backToLobbyBtn.addEventListener("click", () => setView("lobby"));
+  els.resetLobbyBtn.addEventListener("click", () => {
+    if (!confirm("¿Reiniciar solo el lobby? Los personajes y la campaña se conservan.")) return;
+    const currentTable = state.table;
+    state.table = {
+      ...defaultTable(),
+      serverName: currentTable.serverName,
+      serverId: createServerId(),
+      levelPermission: currentTable.levelPermission,
+      levelCap: currentTable.levelCap,
+      view: "lobby"
+    };
+    saveState();
+    render();
+  });
+  els.lobbyServerName.addEventListener("input", () => {
+    state.table.serverName = els.lobbyServerName.value;
+    els.serverName.value = els.lobbyServerName.value;
+    saveState();
+  });
+  els.lobbyServerId.addEventListener("input", () => {
+    state.table.serverId = els.lobbyServerId.value;
+    els.serverId.value = els.lobbyServerId.value;
+    connectOnlineRoom(true);
+    saveState();
+  });
+  els.lobbyJoinTarget.addEventListener("input", () => {
+    state.table.joinTarget = els.lobbyJoinTarget.value;
+    saveState();
+  });
   els.characterName.addEventListener("input", () => {
     currentCharacter().name = els.characterName.value;
     saveState();
     renderCharacterList();
+    renderTableControls();
   });
   els.characterClass.addEventListener("change", () => {
     currentCharacter().className = els.characterClass.value;
     saveState();
     renderCharacterList();
+    renderTableControls();
   });
   els.characterLevel.addEventListener("input", () => {
-    currentCharacter().level = Number(els.characterLevel.value || 1);
+    if (!canEditLevel()) {
+      els.characterLevel.value = currentCharacter().level;
+      alert("El DM todavia no habilito la subida de nivel.");
+      return;
+    }
+    const requestedLevel = Number(els.characterLevel.value || 1);
+    const cappedLevel = Math.min(requestedLevel, Math.max(1, Number(state.table.levelCap || 1)));
+    currentCharacter().level = cappedLevel;
+    els.characterLevel.value = cappedLevel;
     saveState();
     renderCharacterList();
+    renderTableControls();
   });
   els.difficulty.addEventListener("change", () => {
     currentCharacter().difficulty = els.difficulty.value;
@@ -525,6 +1329,52 @@ function bindInputs() {
     render();
     event.target.value = "";
   });
+  els.serverName.addEventListener("input", () => {
+    state.table.serverName = els.serverName.value;
+    saveState();
+  });
+  els.confirmDmBtn.addEventListener("click", () => addParticipant("dm"));
+  els.addPlayerBtn.addEventListener("click", () => addParticipant("player"));
+  els.levelPermission.addEventListener("change", () => setLevelPermission(els.levelPermission.value));
+  els.globalLevelPermission.addEventListener("change", () => setLevelPermission(els.globalLevelPermission.value));
+  els.partyLevelCap.addEventListener("input", () => {
+    state.table.levelCap = Math.max(1, Number(els.partyLevelCap.value || 1));
+    saveState();
+    renderTableControls();
+  });
+  document.querySelector("#copyServerIdBtn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(state.table.serverId);
+      state.table.lastConnectionNote = "ID copiado. Compartelo con tus jugadores como nombre de mesa.";
+    } catch {
+      state.table.lastConnectionNote = `Copia manualmente este ID: ${state.table.serverId}`;
+    }
+    saveState();
+    renderTableControls();
+  });
+  document.querySelector("#joinServerBtn").addEventListener("click", () => {
+    state.table.joinTarget = els.joinTarget.value.trim();
+    state.table.lastConnectionNote = state.table.joinTarget
+      ? `Vinculo guardado hacia ${state.table.joinTarget}. La sincronizacion online se activara cuando exista servidor/P2P.`
+      : "Modo local: listo para exportar/importar. La conexion online real necesita un servidor externo.";
+    saveState();
+    renderTableControls();
+  });
+  els.levelUpBtn.addEventListener("click", () => raiseCharacterLevel(currentCharacter()));
+  els.approveActiveLevelBtn.addEventListener("click", () => {
+    const character = currentCharacter();
+    state.table.levelCap = Math.max(Number(state.table.levelCap || 1), Number(character.level || 1) + 1);
+    raiseCharacterLevel(character);
+  });
+  els.syncPartyLevelBtn.addEventListener("click", () => {
+    if (!isDm()) return;
+    const cap = Math.max(1, Number(state.table.levelCap || 1));
+    state.characters.forEach((character) => {
+      character.level = Math.min(cap, Math.max(Number(character.level || 1), cap));
+    });
+    saveState();
+    render();
+  });
 
   document.querySelector("#addCharacterBtn").addEventListener("click", () => {
     const character = defaultCharacter(state.characters.length);
@@ -541,6 +1391,9 @@ function bindInputs() {
     const character = currentCharacter();
     if (!confirm(`¿Eliminar el personaje "${character.name}"?`)) return;
     state.characters = state.characters.filter((item) => item.id !== character.id);
+    state.table.participants.forEach((participant) => {
+      if (participant.characterId === character.id) participant.characterId = "";
+    });
     activeId = state.characters[0].id;
     saveState();
     render();
@@ -667,4 +1520,5 @@ function escapeHtml(value) {
 
 renderClassOptions();
 bindInputs();
+initOnlineSync();
 render();
