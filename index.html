@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DAMNATUS 3.0 Firebase</title>
-    <link rel="stylesheet" href="./styles.css?v=31" />
+    <title>DAMNATUS 3.2 Firebase</title>
+    <link rel="stylesheet" href="./styles.css?v=32" />
   </head>
   <body>
     <section id="lobbyView" class="lobby-view" aria-label="Lobby de partida">
@@ -51,8 +51,8 @@
               <input id="lobbyJoinTarget" type="text" placeholder="Pide este dato al DM" />
             </label>
             <label>
-              Nombre del jugador
-              <input id="lobbyPlayerName" type="text" placeholder="Tu nombre en mesa" />
+              ID de Discord
+              <input id="lobbyPlayerDiscordId" type="text" inputmode="numeric" placeholder="Ej: 123456789012345678" />
             </label>
             <label>
               Personaje
@@ -403,9 +403,9 @@
       </article>
     </template>
 
-    <script src="./firebase-config.js?v=31"></script>
+    <script src="./firebase-config.js?v=32"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script defer src="./app.js?v=31"></script>
+    <script defer src="./app.js?v=32"></script>
   </body>
 </html>

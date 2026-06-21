@@ -84,7 +84,7 @@ Object.assign(els, {
   lobbyServerId: document.querySelector("#lobbyServerId"),
   lobbyDmName: document.querySelector("#lobbyDmName"),
   lobbyJoinTarget: document.querySelector("#lobbyJoinTarget"),
-  lobbyPlayerName: document.querySelector("#lobbyPlayerName"),
+  lobbyPlayerDiscordId: document.querySelector("#lobbyPlayerDiscordId"),
   lobbyPlayerCharacter: document.querySelector("#lobbyPlayerCharacter"),
   lobbyPeopleCount: document.querySelector("#lobbyPeopleCount"),
   lobbyPeopleList: document.querySelector("#lobbyPeopleList"),
@@ -727,13 +727,14 @@ function renderParticipantCharacterOptions() {
 
   const noCharacter = document.createElement("option");
   noCharacter.value = "";
-  noCharacter.textContent = "Sin personaje";
+  noCharacter.textContent = "Detectar por Discord ID";
   els.participantCharacter.append(noCharacter);
 
   state.characters.forEach((character) => {
     const option = document.createElement("option");
     option.value = character.id;
-    option.textContent = `${character.name} - ${character.className} nivel ${character.level}`;
+    const linked = character.ownerDiscordId ? ` - Discord ${character.ownerDiscordId}` : "";
+    option.textContent = `${character.name} - ${character.className} nivel ${character.level}${linked}`;
     els.participantCharacter.append(option);
   });
 
@@ -810,6 +811,8 @@ function renderLobbyCharacterOptions() {
 
   if ([...els.lobbyPlayerCharacter.options].some((option) => option.value === currentValue)) {
     els.lobbyPlayerCharacter.value = currentValue;
+  } else {
+    els.lobbyPlayerCharacter.value = "";
   }
 }
 
@@ -880,9 +883,9 @@ function createLobbyFromDm() {
 
 async function addLobbyPlayer() {
   const target = els.lobbyJoinTarget.value.trim();
-  const name = els.lobbyPlayerName.value.trim();
-  if (!target || !name) {
-    alert("Escribe el PIN/nombre de partida y el nombre del jugador.");
+  const discordId = normalizeDiscordId(els.lobbyPlayerDiscordId.value);
+  if (!target || !discordId) {
+    alert("Escribe el PIN/nombre de partida y tu ID de Discord.");
     return;
   }
   if (!state.table.dmConfirmed && onlineSync.enabled) {
@@ -902,18 +905,47 @@ async function addLobbyPlayer() {
     return;
   }
   state.table.joinTarget = target;
+  const selectedCharacterId = els.lobbyPlayerCharacter.value;
+  let character = selectedCharacterId
+    ? state.characters.find((item) => item.id === selectedCharacterId)
+    : findCharacterByDiscordId(discordId);
+  if (!character) {
+    character = defaultCharacter(state.characters.length);
+    character.id = `char_${discordId}`;
+    character.name = `Discord ${discordId}`;
+    character.ownerDiscordId = discordId;
+    state.characters.push(character);
+  }
+  character.ownerDiscordId = discordId;
+  state.table.participants = state.table.participants.filter((participant) => {
+    return participant.id !== discordId && participant.discordId !== discordId;
+  });
   state.table.participants.push({
-    id: crypto.randomUUID(),
-    name,
+    id: discordId,
+    discordId,
+    name: character.name || `Discord ${discordId}`,
     role: "player",
-    characterId: els.lobbyPlayerCharacter.value,
+    characterId: character.id,
     active: true,
     confirmed: true
   });
-  state.table.lastConnectionNote = `${name} entro al lobby como jugador.`;
-  els.lobbyPlayerName.value = "";
+  activeId = character.id;
+  state.table.lastConnectionNote = `${character.name} entro al lobby con Discord ID ${discordId}.`;
+  els.lobbyPlayerDiscordId.value = "";
   saveState();
   render();
+}
+
+function normalizeDiscordId(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function findCharacterByDiscordId(discordId) {
+  return state.characters.find((character) => {
+    const ownerDiscordId = normalizeDiscordId(character.ownerDiscordId);
+    const idDiscordId = normalizeDiscordId(extractDiscordIdFromCharacterId(character.id));
+    return ownerDiscordId === discordId || idDiscordId === discordId;
+  });
 }
 
 function addParticipant(role) {
