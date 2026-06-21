@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DAMNATUS 3.0 Firebase</title>
-    <link rel="stylesheet" href="./styles.css?v=30" />
+    <link rel="stylesheet" href="./styles.css?v=31" />
   </head>
   <body>
     <section id="lobbyView" class="lobby-view" aria-label="Lobby de partida">
@@ -249,9 +249,13 @@
           <details class="panel dm-panel" open>
             <summary class="panel-heading">
               <h2>Control DM</h2>
-              <span>Niveles y conexion</span>
+              <span>Premios y estado</span>
             </summary>
             <div class="dm-control-grid">
+              <label>
+                Personaje objetivo
+                <select id="dmTargetCharacter"></select>
+              </label>
               <label>
                 Nivel maximo permitido
                 <input id="partyLevelCap" type="number" min="1" max="99" />
@@ -267,6 +271,32 @@
             <div class="section-actions split-actions">
               <button id="approveActiveLevelBtn" class="small-button" type="button">Aprobar activo</button>
               <button id="syncPartyLevelBtn" class="small-button" type="button">Igualar al maximo</button>
+            </div>
+            <div class="dm-reward-grid">
+              <label>
+                Cobre
+                <input id="dmCopperAmount" type="number" min="-999999" max="999999" placeholder="0" />
+              </label>
+              <label>
+                Objeto
+                <input id="dmRewardItem" type="text" placeholder="Nombre del premio" />
+              </label>
+              <label>
+                Estado
+                <input id="dmStateName" type="text" placeholder="Bendecido, herido..." />
+              </label>
+              <label>
+                Nota
+                <input id="dmRewardNote" type="text" placeholder="Motivo o escena" />
+              </label>
+            </div>
+            <div class="section-actions dm-action-grid">
+              <button id="dmLevelDownBtn" class="small-button" type="button">Nivel -1</button>
+              <button id="dmLevelUpBtn" class="small-button" type="button">Nivel +1</button>
+              <button id="dmGiveCopperBtn" class="small-button" type="button">Dar cobre</button>
+              <button id="dmGiveItemBtn" class="small-button" type="button">Dar objeto</button>
+              <button id="dmApplyStateBtn" class="small-button" type="button">Aplicar estado</button>
+              <button id="dmClearStateBtn" class="danger-button" type="button">Quitar estado</button>
             </div>
             <p id="dmControlHint" class="table-hint"></p>
           </details>
@@ -373,9 +403,9 @@
       </article>
     </template>
 
-    <script src="./firebase-config.js?v=30"></script>
+    <script src="./firebase-config.js?v=31"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script defer src="./app.js?v=30"></script>
+    <script defer src="./app.js?v=31"></script>
   </body>
 </html>

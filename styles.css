@@ -579,8 +579,20 @@ details.panel > :not(summary) {
 
 .dm-control-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
   gap: 12px;
+}
+
+.dm-reward-grid,
+.dm-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.dm-action-grid {
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
 }
 
 .tracker-card {
@@ -836,7 +848,9 @@ details.panel > :not(summary) {
   .item-main,
   .copy-row,
   .participant-actions,
-  .dm-control-grid {
+  .dm-control-grid,
+  .dm-reward-grid,
+  .dm-action-grid {
     grid-template-columns: 1fr;
   }
 

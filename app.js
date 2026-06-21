@@ -56,6 +56,17 @@ const els = {
   globalLevelPermission: document.querySelector("#globalLevelPermission"),
   approveActiveLevelBtn: document.querySelector("#approveActiveLevelBtn"),
   syncPartyLevelBtn: document.querySelector("#syncPartyLevelBtn"),
+  dmTargetCharacter: document.querySelector("#dmTargetCharacter"),
+  dmCopperAmount: document.querySelector("#dmCopperAmount"),
+  dmRewardItem: document.querySelector("#dmRewardItem"),
+  dmStateName: document.querySelector("#dmStateName"),
+  dmRewardNote: document.querySelector("#dmRewardNote"),
+  dmLevelDownBtn: document.querySelector("#dmLevelDownBtn"),
+  dmLevelUpBtn: document.querySelector("#dmLevelUpBtn"),
+  dmGiveCopperBtn: document.querySelector("#dmGiveCopperBtn"),
+  dmGiveItemBtn: document.querySelector("#dmGiveItemBtn"),
+  dmApplyStateBtn: document.querySelector("#dmApplyStateBtn"),
+  dmClearStateBtn: document.querySelector("#dmClearStateBtn"),
   dmControlHint: document.querySelector("#dmControlHint"),
   botCopper: document.querySelector("#botCopper"),
   botStatesCount: document.querySelector("#botStatesCount"),
@@ -669,6 +680,22 @@ function renderTableControls() {
   els.levelUpBtn.disabled = !levelOpen && !dmMode;
   els.approveActiveLevelBtn.disabled = !dmMode;
   els.syncPartyLevelBtn.disabled = !dmMode;
+  renderDmTargetOptions();
+  [
+    els.dmTargetCharacter,
+    els.dmCopperAmount,
+    els.dmRewardItem,
+    els.dmStateName,
+    els.dmRewardNote,
+    els.dmLevelDownBtn,
+    els.dmLevelUpBtn,
+    els.dmGiveCopperBtn,
+    els.dmGiveItemBtn,
+    els.dmApplyStateBtn,
+    els.dmClearStateBtn
+  ].forEach((element) => {
+    element.disabled = !dmMode;
+  });
   els.dmControlHint.textContent = dmMode
     ? `DM activo: ${dmParticipant?.name || "sin nombre"} controla la mesa. ${character.name} puede llegar hasta nivel ${table.levelCap}.`
     : levelOpen
@@ -676,6 +703,22 @@ function renderTableControls() {
       : table.dmConfirmed
         ? `Jugador: la subida de nivel esta bloqueada por el DM.`
         : `Primero confirma quien sera el DM de esta mesa.`;
+}
+
+function renderDmTargetOptions() {
+  const currentValue = els.dmTargetCharacter.value || activeId;
+  els.dmTargetCharacter.innerHTML = "";
+
+  state.characters.forEach((character) => {
+    const option = document.createElement("option");
+    option.value = character.id;
+    option.textContent = `${character.name} - ${character.className} nivel ${character.level}`;
+    els.dmTargetCharacter.append(option);
+  });
+
+  els.dmTargetCharacter.value = state.characters.some((character) => character.id === currentValue)
+    ? currentValue
+    : activeId;
 }
 
 function renderParticipantCharacterOptions() {
@@ -1182,6 +1225,126 @@ function renderBotList(container, rows, formatter, emptyText) {
   });
 }
 
+function dmTargetCharacter() {
+  const targetId = els.dmTargetCharacter.value || activeId;
+  return state.characters.find((character) => character.id === targetId) || currentCharacter();
+}
+
+function addDmHistory(character, action, detail = {}) {
+  character.history = Array.isArray(character.history) ? character.history : [];
+  character.history.push({
+    accion: action,
+    detalle: detail.note || "",
+    precio: detail.copper || 0,
+    item: detail.item || "",
+    estado: detail.state || "",
+    fecha: new Date().toISOString(),
+    fuente: "Panel DM"
+  });
+  character.history = character.history.slice(-40);
+}
+
+function applyDmLevel(delta) {
+  if (!isDm()) return;
+  const character = dmTargetCharacter();
+  const cap = Math.max(1, Number(state.table.levelCap || 1));
+  const nextLevel = Math.max(1, Math.min(99, Number(character.level || 1) + delta));
+  character.level = delta > 0 ? Math.min(nextLevel, cap) : nextLevel;
+  addDmHistory(character, delta > 0 ? "Nivel aumentado por DM" : "Nivel reducido por DM", {
+    note: els.dmRewardNote.value.trim()
+  });
+  activeId = character.id;
+  saveState();
+  render();
+}
+
+function giveDmCopper() {
+  if (!isDm()) return;
+  const amount = Number(els.dmCopperAmount.value || 0);
+  if (!amount) return;
+  const character = dmTargetCharacter();
+  character.cobre = Math.max(0, Number(character.cobre || 0) + amount);
+  addDmHistory(character, "Cobre asignado por DM", {
+    copper: amount,
+    note: els.dmRewardNote.value.trim()
+  });
+  els.dmCopperAmount.value = "";
+  activeId = character.id;
+  saveState();
+  render();
+}
+
+function giveDmItem() {
+  if (!isDm()) return;
+  const title = els.dmRewardItem.value.trim();
+  if (!title) return;
+  const character = dmTargetCharacter();
+  character.inventory = Array.isArray(character.inventory) ? character.inventory : [];
+  character.inventory.push({
+    id: crypto.randomUUID(),
+    nombre: title,
+    tipo: "premio",
+    nota: els.dmRewardNote.value.trim(),
+    fuente: "Panel DM",
+    createdAt: new Date().toISOString()
+  });
+  addDmHistory(character, "Objeto asignado por DM", {
+    item: title,
+    note: els.dmRewardNote.value.trim()
+  });
+  els.dmRewardItem.value = "";
+  activeId = character.id;
+  saveState();
+  render();
+}
+
+function applyDmState() {
+  if (!isDm()) return;
+  const stateName = els.dmStateName.value.trim();
+  if (!stateName) return;
+  const character = dmTargetCharacter();
+  character.states = Array.isArray(character.states) ? character.states : [];
+  const exists = character.states.some((stateItem) => {
+    const label = stateItem.nombre || stateItem.name || stateItem.id || stateItem;
+    return String(label).toLowerCase() === stateName.toLowerCase();
+  });
+  if (!exists) {
+    character.states.push({
+      id: crypto.randomUUID(),
+      nombre: stateName,
+      nota: els.dmRewardNote.value.trim(),
+      fuente: "Panel DM",
+      createdAt: new Date().toISOString()
+    });
+  }
+  addDmHistory(character, "Estado aplicado por DM", {
+    state: stateName,
+    note: els.dmRewardNote.value.trim()
+  });
+  activeId = character.id;
+  saveState();
+  render();
+}
+
+function clearDmState() {
+  if (!isDm()) return;
+  const stateName = els.dmStateName.value.trim();
+  if (!stateName) return;
+  const character = dmTargetCharacter();
+  character.states = Array.isArray(character.states) ? character.states : [];
+  character.states = character.states.filter((stateItem) => {
+    const label = stateItem.nombre || stateItem.name || stateItem.id || stateItem;
+    return String(label).toLowerCase() !== stateName.toLowerCase();
+  });
+  addDmHistory(character, "Estado quitado por DM", {
+    state: stateName,
+    note: els.dmRewardNote.value.trim()
+  });
+  activeId = character.id;
+  saveState();
+  render();
+}
+
 function getAvailability(effect) {
   const character = currentCharacter();
   if (effect.cooldownType === "rounds") {
@@ -1375,6 +1538,16 @@ function bindInputs() {
     saveState();
     render();
   });
+  els.dmTargetCharacter.addEventListener("change", () => {
+    activeId = els.dmTargetCharacter.value || activeId;
+    render();
+  });
+  els.dmLevelDownBtn.addEventListener("click", () => applyDmLevel(-1));
+  els.dmLevelUpBtn.addEventListener("click", () => applyDmLevel(1));
+  els.dmGiveCopperBtn.addEventListener("click", giveDmCopper);
+  els.dmGiveItemBtn.addEventListener("click", giveDmItem);
+  els.dmApplyStateBtn.addEventListener("click", applyDmState);
+  els.dmClearStateBtn.addEventListener("click", clearDmState);
 
   document.querySelector("#addCharacterBtn").addEventListener("click", () => {
     const character = defaultCharacter(state.characters.length);
